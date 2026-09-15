@@ -1,14 +1,1617 @@
+
 <!doctype html>
+<!--
+  ===========================================================================
+  多奇教育訓練 — 公開維護頁面（index.html）
+  ===========================================================================
+
+  本檔改編自 Duotify EIP 的 app_offline.htm，換成多奇教育訓練
+  （learn.duotify.com）的品牌配色、文案與聯絡窗口，並作為 GitHub Pages 根頁。
+
+  【目前部署】
+  根網址由本檔直接提供，站台回應 2xx 時顯示常駐小遊戲；若探測到 HTTP 503，
+  則切換為維護文案。搜尋 setToyMode 可看到完整邏輯。
+
+  【設計上的三個硬限制（改本檔前務必理解）】
+  1. 維護檔生效時，站內任何相對路徑（/styles.css、/favicon.ico、/api/...）
+     都會拿到「本檔的 HTML」而不是原本的資源。
+     → 所以 CSS / JS 一律 inline，favicon 用 data URI，絕不引用同源檔案。
+  2. 外部 CDN / 圖片站台不保證連得到（公司網路封鎖、使用者離線）。
+     → Three.js 是「漸進增強」：載不到時保留純 CSS 場景，頁面依然完整。
+     → 主視覺插畫直接內嵌成 data URI（壓縮後約 25KB），零外部依賴一定看得到；
+       設定 CONFIG.assetBase 後才會在背景換成外部高解析版。
+  3. 檔案務必大於 512 bytes，否則部分瀏覽器會用自己的錯誤頁蓋掉（本檔遠大於此）。
+
+  【要調整的東西，全部集中在下面的 CONFIG 區塊】
+  搜尋 `const CONFIG` 即可，包含：
+    - assetBase        圖片站台網址（留空 = 只用內嵌版，版面一樣完整）
+    - estimatedReturn  預計恢復時間（留空 = 不顯示倒數）
+    - autoDetect       是否自動偵測站台恢復並提示重新整理
+    - toyPath          常駐小遊戲頁的部署路徑（消除模式切換閃動用的提示）
+    - quotes/toyQuotes 兩種身分各自的輪播小語
+
+  聯絡窗口的 email 直接寫在 <p class="foot"> 裡（只在維護模式顯示；
+  小遊戲頁是匿名可存取的，不讓 email 長期曝光給爬蟲）。
+
+  最後更新：2026-09-15
+  ===========================================================================
+-->
 <html lang="zh-Hant-TW">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="refresh" content="0; url=./app_offline.htm">
 <title>系統維護中 — 多奇教育訓練</title>
+<meta name="description" content="多奇教育訓練正在進行例行維護，系統恢復後即可繼續課程學習。">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" id="themeColorMeta" content="#fffdfc">
+
+<link rel="canonical" href="https://learn.duotify.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="多奇教育訓練">
+<meta property="og:title" content="系統維護中 — 多奇教育訓練">
+<meta property="og:description" content="多奇教育訓練正在進行例行維護，系統恢復後即可繼續課程學習。">
+<meta property="og:url" content="https://learn.duotify.com/">
+<!-- 1200×630 PNG 隨本儲存庫部署到 GitHub Pages 自訂網域。 -->
+<meta property="og:image" content="https://duotify-learn-maintenance.gh.miniasp.com/learn-maintenance-og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="多奇教育訓練系統維護通知">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="系統維護中 — 多奇教育訓練">
+<meta name="twitter:description" content="多奇教育訓練正在進行例行維護，系統恢復後即可繼續課程學習。">
+<meta name="twitter:image" content="https://duotify-learn-maintenance.gh.miniasp.com/learn-maintenance-og.png">
+<meta name="twitter:image:alt" content="多奇教育訓練系統維護通知">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "系統維護中 — 多奇教育訓練",
+  "description": "多奇教育訓練正在進行例行維護，系統恢復後即可繼續課程學習。",
+  "url": "https://learn.duotify.com/",
+  "inLanguage": "zh-Hant-TW",
+  "isPartOf": {
+    "@type": "WebSite",
+    "name": "多奇教育訓練",
+    "url": "https://learn.duotify.com/"
+  }
+}
+</script>
+
+<!-- 在樣式表解析前決定主題，避免重新整理時先閃出錯誤配色。 -->
+<script>
+(function(){
+  var key = 'learn_offline_theme';
+  var saved = '';
+  try { saved = localStorage.getItem(key) || ''; } catch (e) {}
+  var valid = saved === 'light' || saved === 'dark';
+  var theme = valid ? saved : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = theme;
+  var meta = document.getElementById('themeColorMeta');
+  if (meta) meta.content = theme === 'dark' ? '#1b1715' : '#fffdfc';
+})();
+</script>
+
+<!-- favicon 用 data URI：同源請求在 app_offline 期間只會拿到 503 -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAADAFBMVEUAAAAAAFUAAKoAAP8AJAAAJFUAJKoAJP8ASQAASVUASaoASf8AbQAAbVUAbaoAbf8AkgAAklUAkqoAkv8AtgAAtlUAtqoAtv8A2wAA21UA26oA2/8A/wAA/1UA/6oA//8kAAAkAFUkAKokAP8kJAAkJFUkJKokJP8kSQAkSVUkSaokSf8kbQAkbVUkbaokbf8kkgAkklUkkqokkv8ktgAktlUktqoktv8k2wAk21Uk26ok2/8k/wAk/1Uk/6ok//9JAABJAFVJAKpJAP9JJABJJFVJJKpJJP9JSQBJSVVJSapJSf9JbQBJbVVJbapJbf9JkgBJklVJkqpJkv9JtgBJtlVJtqpJtv9J2wBJ21VJ26pJ2/9J/wBJ/1VJ/6pJ//9tAABtAFVtAKptAP9tJABtJFVtJKptJP9tSQBtSVVtSaptSf9tbQBtbVVtbaptbf9tkgBtklVtkqptkv9ttgBttlVttqpttv9t2wBt21Vt26pt2/9t/wBt/1Vt/6pt//+SAACSAFWSAKqSAP+SJACSJFWSJKqSJP+SSQCSSVWSSaqSSf+SbQCSbVWSbaqSbf+SkgCSklWSkqqSkv+StgCStlWStqqStv+S2wCS21WS26qS2/+S/wCS/1WS/6qS//+2AAC2AFW2AKq2AP+2JAC2JFW2JKq2JP+2SQC2SVW2Saq2Sf+2bQC2bVW2baq2bf+2kgC2klW2kqq2kv+2tgC2tlW2tqq2tv+22wC221W226q22/+2/wC2/1W2/6q2///bAADbAFXbAKrbAP/bJADbJFXbJKrbJP/bSQDbSVXbSarbSf/bbQDbbVXbbarbbf/bkgDbklXbkqrbkv/btgDbtlXbtqrbtv/b2wDb21Xb26rb2//b/wDb/1Xb/6rb////AAD/AFX/AKr/AP//JAD/JFX/JKr/JP//SQD/SVX/Sar/Sf//bQD/bVX/bar/bf//kgD/klX/kqr/kv//tgD/tlX/tqr/tv//2wD/21X/26r/2////wD//1X//6r////qm24uAAABAHRSTlMA////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////Cpf0PAAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAAAd0SU1FB+kDCQgaMSjXfukAAAEHSURBVDiNdVFBDsQgCOz/X6qJJGJSD3hgEasF7doQJcwMML34OBjBZNdZh2ARB6DEEC1iBxThBwgAfwDKb9VoeEDvH2vjKhrtA4DKL4AcYygnQPs3pliZRKntgMGXRw8MAvOAh/8cmRM8YPEZs1xVMgd4+ZAyau4UlE/9FZMc7E7YGdDwU5YP1zzX619/tV7X8D6AzKyKd0JVyGnkawbQng2VX1Xj9k4q4h7sqip5s1oQs38eN21OAjy1+d0bYPRPYwc9m9UbX7xwAJz7v+FmwLX/uu0Wsn/a+menQEd/USDrA83dV2RkZ9ShMetrC/L9V/31gRJ+8K2ThGuOyl8AHn8bsy0z/wDYGtyrUwP03AAAAABJRU5ErkJggg==">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii02LjU1IDAgNDQgNDQiPjxwYXRoIGQ9Ik0yMC4xNjE4IDEwLjg1NjNDMjAuOTM2MiAxMC44NTYzIDIxLjU2NCAxMC4yMjAxIDIxLjU2NCA5LjQzNTE5QzIxLjU2NCA4LjY1MDMxIDIwLjkzNjIgOC4wMTQwNCAyMC4xNjE4IDguMDE0MDRDMTkuMzg3MyA4LjAxNDA0IDE4Ljc1OTUgOC42NTAzMSAxOC43NTk1IDkuNDM1MTlDMTguNzU5NSAxMC4yMjAxIDE5LjM4NzMgMTAuODU2MyAyMC4xNjE4IDEwLjg1NjNaIiBmaWxsPSIjRkY0RjNFIi8+PHBhdGggZD0iTTI1LjA3NTcgNS4wOTc2TDIwLjA0NTkgMEwwIDIwLjMxNjJMNS4xMzk1MSAyNS41MjUxQzUuODg5NCAyNi4yODUxIDYuNjU3NTggMjYuOTQ2MiA3LjQzNzk2IDI3LjUwODVMOS42NjMyNSAyNS4yNTMyQzguNzE4MjYgMjQuNzI4IDcuNzkxNTYgMjQuMDExMiA2Ljg4MzE2IDIzLjA5MDZMNC40NjI3NyAyMC42Mzc2TDIwLjM4NzMgNC41MDQ0MkwyMi44MDc3IDYuOTU3NDVDMjYuNjI0MiAxMC44MjU0IDI3LjAzODggMTQuOTcxNSAyNC4zODA2IDE5LjEyOTlMMjQuNzc2OSAxOS41MzE1QzI1LjU5MzkgMjAuMzU5NSAyNi4yOTUgMjEuMTk5OCAyNi44ODY0IDIyLjA1MjVDMzAuOTEwMiAxNi4zODY1IDMwLjM3MzcgMTAuNDY3MSAyNS4wNzU3IDUuMDk3NloiIGZpbGw9IiNGRjRGM0UiLz48cGF0aCBkPSJNMjUuMDc1NyAxOS4yMjg4TDIwLjA0NTkgMTQuMTMxMkwwIDM0LjQ0NzRMNS4xMzk1MSAzOS42NTYyQzExLjE4MTMgNDUuNzc5NSAxOC4yMzUyIDQ1LjM0MDggMjQuNTgxOCAzOC45MDg2QzMwLjk1MjkgMzIuNDUxNiAzMS4yMjcyIDI1LjQ2OTUgMjUuMDc1NyAxOS4yMzQ5VjE5LjIyODhaTTIxLjU1NzkgMjMuNTY2NEMyMS41NTc5IDI0LjM1MTEgMjAuOTI5OSAyNC45ODc1IDIwLjE1NTYgMjQuOTg3NUMxOS4zODE0IDI0Ljk4NzUgMTguNzUzNCAyNC4zNTExIDE4Ljc1MzQgMjMuNTY2NEMxOC43NTM0IDIyLjc4MTYgMTkuMzgxNCAyMi4xNDUyIDIwLjE1NTYgMjIuMTQ1MkMyMC45Mjk5IDIyLjE0NTIgMjEuNTU3OSAyMi43ODE2IDIxLjU1NzkgMjMuNTY2NFoiIGZpbGw9IiNGRjdCMzEiLz48L3N2Zz4=">
+
+<style>
+/* =========================================================================
+   1. 設計 token
+   沿用多奇教育訓練前台（wwwroot/css/front.css）的品牌色：
+   品牌橘紅 #FF4F3E（logo）、品牌橘 #FF7B31、品牌藍 #349DFF、
+   暖白底 #FFFDFC / #F7F6F4、內文 #2B2F33、連結藍 #0A66D6。
+   --link 獨立成一個 token：橘色在小字上對比不足，連結一律走藍色。
+   ========================================================================= */
+:root{
+  --bg:        #fffdfc;
+  --bg-deep:   #f2ede9;
+  --ink:       #2b2f33;
+  --ink-soft:  #5a6169;
+  --ink-faint: #8e959c;
+  --line:      rgba(43,47,51,.14);
+  --card:      rgba(255,255,255,.72);
+  --card-line: rgba(255,255,255,.88);
+  --accent:    #ff7b31;
+  --brand:     #ff4f3e;
+  --link:      #0a66d6;
+  --glow-a:    rgba(255,123,49,.34);
+  --glow-b:    rgba(52,157,255,.26);
+  --shadow:    0 18px 50px -22px rgba(74,50,40,.40);
+  --radius:    18px;
+  /* 版面留白抽成 token：.panel 的高度上限要跟 .wrap 的上下留白對齊，
+     兩邊寫死很容易失準。垂直留白改用 dvh，矮視窗（筆電、瀏覽器放大）自動收斂。 */
+  --pad-x:     clamp(24px, 4vw, 64px);
+  --pad-y:     clamp(16px, 3dvh, 64px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme]){
+    --bg:        #1b1715;
+    --bg-deep:   #120f0e;
+    --ink:       #f0eae6;
+    --ink-soft:  #b5aaa3;
+    --ink-faint: #8a807a;
+    --line:      rgba(255,255,255,.13);
+    --card:      rgba(48,40,36,.62);
+    --card-line: rgba(255,255,255,.09);
+    --accent:    #ffa05c;
+    --brand:     #ff7b66;
+    --link:      #6fb2ff;
+    --glow-a:    rgba(255,123,49,.26);
+    --glow-b:    rgba(52,157,255,.22);
+    --shadow:    0 22px 60px -26px rgba(0,0,0,.75);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:        #1b1715;
+  --bg-deep:   #120f0e;
+  --ink:       #f0eae6;
+  --ink-soft:  #b5aaa3;
+  --ink-faint: #8a807a;
+  --line:      rgba(255,255,255,.13);
+  --card:      rgba(48,40,36,.62);
+  --card-line: rgba(255,255,255,.09);
+  --accent:    #ffa05c;
+  --brand:     #ff7b66;
+  --link:      #6fb2ff;
+  --glow-a:    rgba(255,123,49,.26);
+  --glow-b:    rgba(52,157,255,.22);
+  --shadow:    0 22px 60px -26px rgba(0,0,0,.75);
+}
+:root[data-theme="light"]{ color-scheme: light; }
+:root[data-theme="dark"]{ color-scheme: dark; }
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+html,body{ height:100%; }
+body{
+  margin:0;
+  min-height:100dvh;
+  background:
+    radial-gradient(1100px 700px at 78% 8%,  var(--glow-a), transparent 62%),
+    radial-gradient(900px 620px at 12% 92%,  var(--glow-b), transparent 60%),
+    linear-gradient(168deg, var(--bg) 0%, var(--bg-deep) 100%);
+  background-attachment: scroll;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang TC',
+               'Microsoft JhengHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* =========================================================================
+   2. 背景場景
+   .stage  = Three.js canvas（載得到才會有東西）
+   .fallback-scene = 純 CSS 場景，永遠存在，當作 canvas 的底。
+   ========================================================================= */
+.stage{
+  position:fixed; inset:0; width:100%; height:100%;
+  display:block; z-index:1;
+  touch-action: manipulation;
+}
+.fallback-scene{ position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+.fallback-scene i{
+  position:absolute; display:block; border-radius:26%;
+  background: linear-gradient(150deg, var(--accent), var(--brand));
+  opacity:.16; filter: blur(.4px);
+  animation: drift 18s ease-in-out infinite;
+}
+.fallback-scene i:nth-child(1){ width:190px; height:190px; right:12%;  top:18%;  animation-delay:-2s;  }
+.fallback-scene i:nth-child(2){ width:120px; height:120px; right:28%;  top:46%;  animation-delay:-7s;  }
+.fallback-scene i:nth-child(3){ width:150px; height:150px; right:20%;  bottom:12%; animation-delay:-12s; }
+.fallback-scene i:nth-child(4){ width:78px;  height:78px;  left:8%;    top:64%;  animation-delay:-5s;  }
+@keyframes drift{
+  0%,100%{ transform: translate3d(0,0,0) rotate(0deg); }
+  50%    { transform: translate3d(0,-26px,0) rotate(8deg); }
+}
+/* Three.js 成功接手後，把 CSS 備援場景淡出，避免兩層疊在一起 */
+body.webgl-on .fallback-scene{ opacity:0; transition: opacity 1.2s ease .3s; }
+/* 反過來，Three.js 沒能接手時就沒有右半邊的塔了，把面板置中，避免版面偏一邊。 */
+body.no-webgl .wrap{ grid-template-columns: minmax(0, 620px); justify-content:center; }
+body.no-webgl .hud{ display:none; }
+
+/* =========================================================================
+   3. 版面
+   ========================================================================= */
+.wrap{
+  position:relative; z-index:2;
+  min-height:100dvh;
+  display:grid;
+  grid-template-columns: minmax(0, 560px) 1fr;
+  align-items:center;
+  gap:40px;
+  padding: var(--pad-y) var(--pad-x);
+  padding-bottom: calc(var(--pad-y) + env(safe-area-inset-bottom));
+  pointer-events:none;              /* 讓點擊穿透到 canvas 上玩遊戲 */
+}
+.wrap > * { pointer-events:auto; }  /* 面板本身仍可互動 */
+
+.panel{
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  border-radius: calc(var(--radius) + 6px);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  padding: clamp(24px, 3.2vw, 40px);
+  animation: rise .8s cubic-bezier(.16,1,.3,1) both;
+  /* 面板高度必須有上限，否則內容一長就會出事：
+     雙欄時撐高 grid row，把 align-self:end 的 .hud 推到摺線下；
+     單欄時蓋掉 .wrap 預留給 3D 塔的空間，而面板是 pointer-events:auto，
+     點擊全被它吃掉，遊戲就變成點不到。超過上限改成面板內部捲動。 */
+  max-height: calc(100dvh - var(--pad-y) - var(--pad-y) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-faint) transparent;
+}
+.panel::-webkit-scrollbar{ width:8px; }
+.panel::-webkit-scrollbar-thumb{
+  background: var(--ink-faint); border-radius:99px;
+  border:2px solid transparent; background-clip: content-box;
+}
+.panel::-webkit-scrollbar-track{ background: transparent; }
+@keyframes rise{ from{ opacity:0; transform: translateY(18px); } to{ opacity:1; transform:none; } }
+
+.panel-head{
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:16px; margin-bottom:22px;
+}
+.brand{
+  display:inline-flex; align-items:center; gap:10px;
+  font-size:13px; font-weight:600; letter-spacing:.06em;
+  color: var(--ink-soft); text-transform: uppercase;
+  margin-bottom:0;
+}
+/* 品牌標記直接用網站 favicon 的原圖（內嵌），CONFIG.assetBase 有設定時會換成外部版 */
+.brand img{ height:32px; width:auto; display:block; flex:none; }
+.brand img.mark{ width:32px; height:32px; }
+.theme-btn{
+  appearance:none; position:fixed; top:clamp(16px, 3vw, 28px); right:clamp(16px, 3vw, 28px);
+  z-index:10; display:inline-grid; place-items:center; width:40px; height:40px;
+  min-height:40px; padding:0; border-radius:50%;
+  border:1px solid var(--line); background:transparent; color:var(--ink-soft);
+  cursor:pointer; opacity:.62;
+  transition:color .16s ease, border-color .16s ease, background-color .16s ease, opacity .16s ease;
+}
+.theme-btn:hover, .theme-btn:focus-visible{ color:var(--ink); background:rgba(127,127,127,.08); opacity:1; }
+.theme-icon{
+  display:none; width:17px; height:17px; fill:none; stroke:currentColor;
+  stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;
+}
+:root[data-theme="light"] .theme-icon-sun,
+:root:not([data-theme]) .theme-icon-sun{ display:block; }
+:root[data-theme="dark"] .theme-icon-moon{ display:block; }
+
+h1{
+  margin:0 0 14px;
+  font-size: clamp(28px, 4.2vw, 44px);
+  line-height:1.22; font-weight:700; letter-spacing:-.01em;
+}
+h1 .soft{
+  background: linear-gradient(96deg, var(--brand), var(--accent));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.lead{
+  margin:0 0 24px; max-width:46ch;
+  font-size: clamp(15px, 1.35vw, 17px); line-height:1.85; color: var(--ink-soft);
+}
+
+/* 狀態列 ------------------------------------------------------------------ */
+.status{
+  display:flex; align-items:center; gap:10px;
+  font-size:14px; font-weight:500; color: var(--ink-soft);
+  margin-bottom: 14px;
+}
+.dot{
+  width:9px; height:9px; border-radius:50%; background: var(--accent);
+  box-shadow:0 0 0 0 var(--accent); animation: pulse 2.2s ease-out infinite; flex:none;
+}
+.dot.back{ background:#3fbf7f; box-shadow:0 0 0 0 #3fbf7f; }
+@keyframes pulse{
+  0%  { box-shadow:0 0 0 0 currentColor; opacity:1; }
+  70% { box-shadow:0 0 0 10px transparent; opacity:.85; }
+  100%{ box-shadow:0 0 0 0 transparent; opacity:1; }
+}
+
+.bar{
+  height:4px; border-radius:99px; overflow:hidden;
+  background: var(--line); margin-bottom:22px;
+}
+.bar span{
+  display:block; height:100%; width:38%; border-radius:99px;
+  background: linear-gradient(90deg, transparent, var(--brand), var(--accent), transparent);
+  animation: sweep 2.6s ease-in-out infinite;
+}
+@keyframes sweep{ 0%{ transform: translateX(-110%);} 100%{ transform: translateX(320%);} }
+
+/* 預計恢復時間 ------------------------------------------------------------ */
+.eta{
+  display:none; align-items:baseline; gap:12px; flex-wrap:wrap;
+  padding:14px 16px; margin-bottom:22px;
+  border:1px dashed var(--line); border-radius: var(--radius);
+}
+.eta.on{ display:flex; }
+.eta .label{ font-size:13px; color: var(--ink-faint); }
+.eta .clock{
+  font-variant-numeric: tabular-nums; font-feature-settings:'tnum';
+  font-size:22px; font-weight:700; letter-spacing:.02em; color: var(--ink);
+}
+
+/* 一句話輪播 -------------------------------------------------------------- */
+.quote{
+  min-height: 3.2em;
+  display:flex; align-items:center; gap:12px;
+  padding-top:20px; border-top:1px solid var(--line);
+  font-size:15px; line-height:1.7; color: var(--ink-soft);
+}
+.quote .q{ font-size:26px; line-height:1; color: var(--accent); flex:none; opacity:.7; }
+.quote .t{ transition: opacity .5s ease, transform .5s ease; }
+.quote .t.out{ opacity:0; transform: translateY(-6px); }
+
+.mascot{
+  display:block; width:100%; max-width:300px; height:auto;
+  /* 隨視窗高度縮放，矮視窗不會被一張大圖吃掉整個面板 */
+  max-height: 26dvh; object-fit: contain;
+  margin: 20px auto -10px;
+  filter: drop-shadow(0 18px 30px rgba(74,50,40,.22));
+  animation: breathe 6s ease-in-out infinite;
+}
+/* 極輕微的「呼吸」，像真的在睡覺 */
+@keyframes breathe{
+  0%,100%{ transform: translateY(0)     scale(1);     }
+  50%    { transform: translateY(-5px)  scale(1.012); }
+}
+/* 螢幕不夠高時（筆電、瀏覽器放大）先讓位給文字資訊。
+   門檻取 900px：面板不含插畫約 614px，加上插畫與上下留白需要約 900px 才擺得下；
+   原本的 720px 太低，會在 721～900px 之間讓插畫硬擠進來，把聯絡資訊推出可視範圍。
+   條件限定在「橫向且不窄」的視窗：窄螢幕與直式視窗要留著插畫，
+   那裡 3D 塔可能沒跑起來，插畫是唯一的主視覺。 */
+@media (max-height: 900px) and (min-width: 761px) and (min-aspect-ratio: 1/1){
+  .mascot{ display:none; }
+}
+
+.foot{
+  margin-top:24px; padding-top:18px; border-top:1px solid var(--line);
+  font-size:13px; line-height:1.9; color: var(--ink-faint);
+}
+.foot a{ color: var(--link); text-decoration:none; border-bottom:1px solid transparent; }
+.foot a:hover{ border-bottom-color: currentColor; }
+
+/* =========================================================================
+   4. 遊戲 HUD
+   ========================================================================= */
+/* 固定在視窗右下角，而不是當 grid item。
+   當 grid item 時，面板一長就會把整個 row 撐高，HUD 跟著被推到摺線下，
+   使用者得往下捲才看得到分數與按鈕。HUD 顧名思義要一直待在視野裡。 */
+.hud{
+  position:fixed; z-index:3;
+  right: var(--pad-x);
+  bottom: calc(var(--pad-y) + env(safe-area-inset-bottom));
+  display:flex; flex-direction:column; align-items:flex-end; gap:12px;
+  text-align:right;
+  /* HUD 蓋在遊戲區上方，只有按鈕該吃點擊；分數與提示是純顯示，
+     讓點擊穿透過去落塊，玩家才不會「點到提示就沒反應」。 */
+  pointer-events:none;
+}
+.hud .tools{ pointer-events:auto; }
+.scoreboard{
+  display:flex; align-items:flex-end; gap:18px;
+  background: var(--card);
+  border:1px solid var(--card-line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  padding:14px 20px;
+}
+.scoreboard .n{
+  font-variant-numeric: tabular-nums; font-feature-settings:'tnum';
+  font-size:34px; font-weight:700; line-height:1; letter-spacing:-.02em;
+}
+.scoreboard .n.best{ font-size:20px; color: var(--ink-soft); }
+.scoreboard .k{ display:block; font-size:11px; letter-spacing:.1em; color: var(--ink-faint); margin-bottom:6px; }
+.scoreboard .sep{ width:1px; align-self:stretch; background: var(--line); }
+
+.hint{
+  font-size:13px; color: var(--ink-soft);
+  background: var(--card); border:1px solid var(--card-line);
+  border-radius:99px; padding:8px 16px;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  animation: bob 2.8s ease-in-out infinite;
+}
+@keyframes bob{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-4px);} }
+.hint kbd{
+  font: inherit; font-weight:600; color: var(--ink);
+  border:1px solid var(--line); border-bottom-width:2px; border-radius:6px;
+  padding:1px 7px; margin:0 2px; background: rgba(127,127,127,.08);
+}
+
+.tools{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.icon-btn{
+  width:44px; height:44px; min-width:44px; min-height:44px; padding:0;
+  border-radius:50%; cursor:pointer; display:grid; place-items:center;
+  background: var(--card); color: var(--ink-soft);
+  border:1px solid var(--card-line);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transition: transform .16s ease, color .16s ease;
+}
+.icon-btn:hover{ transform: translateY(-2px); color: var(--ink); }
+.action-icon{
+  display:block; width:18px; height:18px; fill:none; stroke:currentColor;
+  stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;
+}
+.sound-icon{ display:none; }
+#soundBtn[aria-pressed="true"] .sound-icon-on{ display:block; }
+#soundBtn[aria-pressed="false"] .sound-icon-off{ display:block; }
+.place-btn{ padding:0; }
+
+/* 完美落點的浮動提示 ------------------------------------------------------ */
+.toast{
+  position:fixed; left:50%; top:26%; z-index:6;
+  transform: translate(-50%, 0) scale(.9);
+  font-size:20px; font-weight:700; letter-spacing:.04em;
+  color: var(--accent); text-shadow:0 2px 18px rgba(0,0,0,.18);
+  opacity:0; pointer-events:none;
+}
+.toast.show{ animation: pop 1s cubic-bezier(.16,1,.3,1) forwards; }
+@keyframes pop{
+  0%  { opacity:0; transform: translate(-50%, 14px) scale(.85); }
+  25% { opacity:1; transform: translate(-50%, -6px) scale(1.06); }
+  100%{ opacity:0; transform: translate(-50%, -46px) scale(1); }
+}
+
+/* 結束卡 ------------------------------------------------------------------ */
+.gameover{
+  position:fixed; inset:0; z-index:7; width:100%; height:100%; max-width:none; max-height:none;
+  margin:0; padding:24px; border:0; color:var(--ink);
+  display:none; place-items:center; background:transparent;
+}
+.gameover[open]{ display:grid; }
+.gameover.on{ display:grid; background:rgba(20,24,30,.28); backdrop-filter:blur(3px); }
+.gameover::backdrop{ background:rgba(20,24,30,.28); backdrop-filter:blur(3px); }
+.gameover .card{
+  width:min(380px, 100%); text-align:center;
+  background: var(--card); border:1px solid var(--card-line);
+  border-radius: calc(var(--radius) + 6px); box-shadow: var(--shadow);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  padding: 32px 28px;
+  animation: rise .45s cubic-bezier(.16,1,.3,1) both;
+}
+.gameover form{ margin:0; }
+.gameover h2{ margin:0 0 6px; font-size:20px; font-weight:700; }
+.gameover p{ margin:0 0 22px; font-size:14px; line-height:1.8; color: var(--ink-soft); }
+.gameover .big{
+  font-variant-numeric: tabular-nums; font-size:56px; font-weight:700;
+  line-height:1; letter-spacing:-.03em; margin:4px 0 2px;
+  background: linear-gradient(96deg, var(--brand), var(--accent));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.btn{
+  appearance:none; cursor:pointer; font: inherit; font-weight:600; font-size:15px;
+  padding:12px 26px; border-radius:99px; border:0;
+  color:#fff; background: linear-gradient(120deg, var(--brand), var(--accent));
+  box-shadow: 0 10px 26px -10px var(--brand);
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+.btn:hover{ transform: translateY(-2px); box-shadow:0 16px 30px -12px var(--brand); }
+.btn.ghost{
+  background:none; color: var(--ink-soft); box-shadow:none;
+  border:1px solid var(--line); padding:11px 20px; font-weight:500;
+}
+.btn.ghost:hover{ color: var(--ink); }
+
+/* 站台恢復橫幅 ------------------------------------------------------------ */
+.back-banner{
+  position:fixed; z-index:9; left:50%; bottom:26px; transform: translate(-50%, 140%);
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:center;
+  max-width: calc(100vw - 32px);
+  padding:14px 16px 14px 22px; border-radius:99px;
+  background: var(--card); border:1px solid var(--card-line);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  transition: transform .6s cubic-bezier(.16,1,.3,1);
+}
+.back-banner.on{ transform: translate(-50%, 0); }
+.back-banner .msg{ font-size:14px; font-weight:600; }
+.back-banner .msg small{ display:block; font-weight:400; color: var(--ink-soft); font-size:12.5px; }
+.back-actions{ display:flex; gap:8px; }
+
+/* =========================================================================
+   5. RWD
+   ========================================================================= */
+/* 窄螢幕：面板留在上方，畫面下半部讓給 3D 塔（camera 的 shiftY 會把塔往下推），
+   HUD 改成固定在最底部的一條，避免被面板擠到摺線以下。 */
+/* 何時改用「面板在上、塔在下」的堆疊版面？
+   條件是「視窗夠窄」，不是單純的寬度門檻。原本只看 max-width:1080px，
+   會把「寬而矮」的視窗（例如瀏覽器放大兩級後的 1069×483）也算成窄螢幕，
+   結果面板與塔在垂直方向互相擠壓，兩邊都難用。
+   逗號是 OR：真的很窄（<=760px），或是 1080px 以內且偏直式（寬高比 <= 1）才堆疊。
+   這個條件與 JS layout() 裡的 desktop 判斷必須一致，否則塔會偏到面板底下。 */
+@media (max-width: 760px), (max-width: 1080px) and (max-aspect-ratio: 1/1){
+  .wrap{
+    grid-template-columns: 1fr; align-content:start; gap:20px;
+    padding-top: clamp(20px, 6vw, 48px);
+    /* 保留底部空間給 3D 塔與 HUD，內容長時仍可正常捲動 */
+    padding-bottom: calc(42dvh + env(safe-area-inset-bottom));
+  }
+  /* 單欄時面板在上、3D 塔在下。面板高度上限必須扣掉下方預留的 42dvh，
+     否則面板會整個蓋住塔；面板是 pointer-events:auto，蓋住就等於點不到、玩不了。
+     扣掉的 68px 是上方留白加一點餘裕。 */
+  .panel{
+    max-width:620px; margin-inline:auto;
+    /* 240px 是下限：視窗很矮時（例如瀏覽器放大兩級）若嚴格照 58dvh 算，
+       面板只剩 200px 出頭，維護訊息幾乎看不到。維護公告優先於小遊戲。 */
+    max-height: max(calc(58dvh - 68px), 240px);
+  }
+  /* WebGL 有跑起來時，3D 塔就是主視覺，插畫讓位給它；
+     WebGL 掛掉時插畫會自動留下來，畫面不會空。 */
+  body.webgl-on .mascot{ display:none; }
+
+  .hud{
+    position:fixed; z-index:3;
+    left:0; right:0; bottom: calc(14px + env(safe-area-inset-bottom));
+    flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:center;
+    gap:10px; padding:0 16px; text-align:center;
+  }
+  .scoreboard{ order:1; }
+  .tools{ order:2; }
+  .hint{ order:3; flex-basis:100%; }
+  .toast{ top:auto; bottom:34dvh; }
+  .fallback-scene i:nth-child(1){ top:auto; bottom:6%; }
+  /* 恢復橫幅出現時，把 HUD 讓開，兩者不要疊在一起 */
+  body.is-back .hud{ bottom: calc(150px + env(safe-area-inset-bottom)); }
+}
+@media (max-width: 560px){
+  .scoreboard{ padding:12px 16px; gap:14px; }
+  .scoreboard .n{ font-size:28px; }
+  .quote{ font-size:14px; }
+  .back-banner{ border-radius: var(--radius); left:16px; right:16px; transform: translateY(140%); max-width:none; }
+  .back-banner.on{ transform: translateY(0); }
+}
+
+/* =========================================================================
+   6. 無障礙：尊重「減少動態效果」
+   遊戲本身由使用者觸發，保留可玩性；只關掉環境動畫與自動漂浮。
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce){
+  .fallback-scene i, .bar span, .hint, .dot, .mascot{ animation:none !important; }
+  .panel, .gameover .card{ animation-duration:.01ms !important; }
+  .back-banner, .quote .t, .theme-btn, .icon-btn, .btn{ transition:none; }
+}
+
+/* =========================================================================
+   7. 遊戲模式（body.toy）
+   同一個檔案在站台「活著」時會被當成常駐小遊戲頁供人遊玩（/），
+   此時所有跟維護有關的元素都要收起來——包含 foot 裡的聯絡信箱，
+   那頁是匿名可存取的，不該讓 email 長期曝光給爬蟲。
+   ========================================================================= */
+body.toy .status,
+body.toy .bar,
+body.toy .eta,
+body.toy .foot{ display:none; }
+body.toy .back-link{ display:block; }
+.back-link{
+  display:none;
+  margin-top:24px; padding-top:18px; border-top:1px solid var(--line);
+  font-size:13.5px;
+}
+.back-link a{
+  color: var(--link); text-decoration:none; font-weight:500;
+  border-bottom:1px solid transparent;
+}
+.back-link a:hover{ border-bottom-color: currentColor; }
+
+:where(a, button):focus-visible{
+  outline:3px solid var(--link); outline-offset:3px;
+}
+button:disabled{ cursor:not-allowed; opacity:.55; }
+
+/* 避免在畫面中藏著看不見的內容時仍佔用可互動空間。 */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+noscript .panel{ margin: 10vh auto; }
+</style>
 </head>
+
 <body>
-<p>正在載入維護頁面……</p>
-<p><a href="./app_offline.htm">開啟維護頁面</a></p>
+
+<!-- 純 CSS 備援場景：Three.js 載不到時，畫面依然有層次 -->
+<div class="fallback-scene" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+<button class="theme-btn" id="themeBtn" type="button" aria-pressed="false" aria-label="切換為深色模式">
+  <svg class="theme-icon theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+  </svg>
+  <svg class="theme-icon theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path d="M20.7 15.2A8.5 8.5 0 0 1 8.8 3.3 8.5 8.5 0 1 0 20.7 15.2Z"></path>
+  </svg>
+</button>
+
+<!-- Three.js 舞台 -->
+<canvas class="stage" id="stage" aria-hidden="true"></canvas>
+
+<main class="wrap">
+
+  <section class="panel" aria-labelledby="pageTitle">
+    <div class="panel-head">
+    <div class="brand">
+      <img class="mark" id="brandMark" alt="" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii02LjU1IDAgNDQgNDQiPjxwYXRoIGQ9Ik0yMC4xNjE4IDEwLjg1NjNDMjAuOTM2MiAxMC44NTYzIDIxLjU2NCAxMC4yMjAxIDIxLjU2NCA5LjQzNTE5QzIxLjU2NCA4LjY1MDMxIDIwLjkzNjIgOC4wMTQwNCAyMC4xNjE4IDguMDE0MDRDMTkuMzg3MyA4LjAxNDA0IDE4Ljc1OTUgOC42NTAzMSAxOC43NTk1IDkuNDM1MTlDMTguNzU5NSAxMC4yMjAxIDE5LjM4NzMgMTAuODU2MyAyMC4xNjE4IDEwLjg1NjNaIiBmaWxsPSIjRkY0RjNFIi8+PHBhdGggZD0iTTI1LjA3NTcgNS4wOTc2TDIwLjA0NTkgMEwwIDIwLjMxNjJMNS4xMzk1MSAyNS41MjUxQzUuODg5NCAyNi4yODUxIDYuNjU3NTggMjYuOTQ2MiA3LjQzNzk2IDI3LjUwODVMOS42NjMyNSAyNS4yNTMyQzguNzE4MjYgMjQuNzI4IDcuNzkxNTYgMjQuMDExMiA2Ljg4MzE2IDIzLjA5MDZMNC40NjI3NyAyMC42Mzc2TDIwLjM4NzMgNC41MDQ0MkwyMi44MDc3IDYuOTU3NDVDMjYuNjI0MiAxMC44MjU0IDI3LjAzODggMTQuOTcxNSAyNC4zODA2IDE5LjEyOTlMMjQuNzc2OSAxOS41MzE1QzI1LjU5MzkgMjAuMzU5NSAyNi4yOTUgMjEuMTk5OCAyNi44ODY0IDIyLjA1MjVDMzAuOTEwMiAxNi4zODY1IDMwLjM3MzcgMTAuNDY3MSAyNS4wNzU3IDUuMDk3NloiIGZpbGw9IiNGRjRGM0UiLz48cGF0aCBkPSJNMjUuMDc1NyAxOS4yMjg4TDIwLjA0NTkgMTQuMTMxMkwwIDM0LjQ0NzRMNS4xMzk1MSAzOS42NTYyQzExLjE4MTMgNDUuNzc5NSAxOC4yMzUyIDQ1LjM0MDggMjQuNTgxOCAzOC45MDg2QzMwLjk1MjkgMzIuNDUxNiAzMS4yMjcyIDI1LjQ2OTUgMjUuMDc1NyAxOS4yMzQ5VjE5LjIyODhaTTIxLjU1NzkgMjMuNTY2NEMyMS41NTc5IDI0LjM1MTEgMjAuOTI5OSAyNC45ODc1IDIwLjE1NTYgMjQuOTg3NUMxOS4zODE0IDI0Ljk4NzUgMTguNzUzNCAyNC4zNTExIDE4Ljc1MzQgMjMuNTY2NEMxOC43NTM0IDIyLjc4MTYgMTkuMzgxNCAyMi4xNDUyIDIwLjE1NTYgMjIuMTQ1MkMyMC45Mjk5IDIyLjE0NTIgMjEuNTU3OSAyMi43ODE2IDIxLjU1NzkgMjMuNTY2NFoiIGZpbGw9IiNGRjdCMzEiLz48L3N2Zz4=">
+      <span>多奇教育訓練</span>
+    </div>
+    </div>
+
+    <h1 id="pageTitle">教室正在<span class="soft">整理中</span><br>很快就開門</h1>
+
+    <p class="lead">
+      我們正在進行例行維護，讓課程播放與學習紀錄跑得更順一點。<br>
+      這段時間先起身走走、倒杯水、伸展一下——
+      或者留下來，陪這座塔堆高一點。
+    </p>
+
+    <div class="status" role="status" aria-live="polite">
+      <span class="dot" id="statusDot" aria-hidden="true"></span>
+      <span id="statusText">維護作業進行中，本頁會自動偵測系統恢復</span>
+    </div>
+    <div class="bar" aria-hidden="true"><span></span></div>
+
+    <div class="eta" id="eta">
+      <span class="label">預計恢復</span>
+      <span class="clock" id="etaClock">—</span>
+      <span class="label" id="etaAbs"></span>
+    </div>
+
+    <div class="quote">
+      <span class="q" aria-hidden="true">“</span>
+      <span class="t" id="quoteText">你今天已經很努力了，這次的等待不算在你頭上。</span>
+    </div>
+
+    <!--
+      主視覺：預設就內嵌一張壓縮過的 WebP（約 19KB，base64 後約 25KB），
+      這樣即使圖片站台還沒上線、或使用者連不到外部網域，插畫都一定看得到。
+      設定 CONFIG.assetBase 之後，JS 會在背景載入外部高解析 PNG 並「替換」這張，
+      失敗則靜靜留著內嵌版，永遠不會出現破圖。
+    -->
+    <img class="mascot" id="mascotImg" alt="一台蓋著毛毯打盹的電腦，旁邊有小夜燈與一杯咖啡" width="319" height="319" decoding="async"
+         src="data:image/webp;base64,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">
+
+    <p class="foot" id="foot">
+      如果這頁停留超過預期，或你有課程、訂單上的急件，<br>
+      請來信 <a href="mailto:training@miniasp.com">training@miniasp.com</a>，
+      或到 <a href="https://discord.com/invite/npvNUVwdgQ" target="_blank" rel="noopener noreferrer">多奇教育訓練 Discord</a> 找我們，我們會盡快回覆。
+    </p>
+
+    <!-- 只在遊戲模式顯示（站台是活的，才有地方可以回去） -->
+    <p class="back-link"><a href="https://learn.duotify.com/">← 回到多奇教育訓練</a></p>
+  </section>
+
+  <aside class="hud" aria-label="疊塔遊戲資訊與操作">
+    <div class="scoreboard">
+      <div>
+        <span class="k">目前</span>
+        <span class="n" id="score">0</span>
+      </div>
+      <div class="sep" aria-hidden="true"></div>
+      <div>
+        <span class="k">最佳</span>
+        <span class="n best" id="best">0</span>
+      </div>
+    </div>
+    <div class="hint" id="hint">點一下畫面，或按 <kbd>空白鍵</kbd> 疊上這一層</div>
+    <div class="tools">
+      <button class="icon-btn place-btn" id="placeBtn" type="button" disabled aria-label="放下這層">
+        <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 4v11"></path>
+          <path d="m8 11 4 4 4-4"></path>
+          <path d="M5 20h14"></path>
+        </svg>
+      </button>
+      <button class="icon-btn" id="soundBtn" type="button" aria-pressed="false" aria-label="開啟音效">
+        <svg class="action-icon sound-icon sound-icon-on" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M11 5 6 9H3v6h3l5 4V5Z"></path>
+          <path d="M15.5 9.5a4 4 0 0 1 0 5"></path>
+          <path d="M18 7a7 7 0 0 1 0 10"></path>
+        </svg>
+        <svg class="action-icon sound-icon sound-icon-off" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M11 5 6 9H3v6h3l5 4V5Z"></path>
+          <path d="m17 9 4 6"></path>
+          <path d="m21 9-4 6"></path>
+        </svg>
+        <span class="sound-state sr-only" id="soundState" aria-hidden="true">關</span>
+      </button>
+      <button class="icon-btn" id="resetBtn" type="button" aria-label="重新開始">
+        <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 12a8 8 0 1 0 2.3-5.7"></path>
+          <path d="M4 5v5h5"></path>
+        </svg>
+      </button>
+    </div>
+  </aside>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog class="gameover" id="gameover" aria-labelledby="goTitle" aria-describedby="goMsg">
+  <div class="card">
+    <h2 id="goTitle">塔倒了，沒關係</h2>
+    <div class="big" id="goScore">0</div>
+    <p id="goMsg">維護也是這樣，一層一層慢慢來。</p>
+    <form method="dialog">
+      <button class="btn" id="againBtn" type="submit">再堆一次</button>
+    </form>
+  </div>
+</dialog>
+
+<aside class="back-banner" id="backBanner" aria-labelledby="backTitle">
+  <div class="msg">
+    <span id="backTitle" role="status" aria-live="polite">系統已恢復服務</span>
+    <small id="backCountdown" aria-live="polite">5 秒後自動帶你回去</small>
+  </div>
+  <div class="back-actions">
+    <button class="btn ghost" id="stayBtn" type="button">再玩一下</button>
+    <button class="btn" id="goBtn" type="button">立即進入</button>
+  </div>
+</aside>
+
+<noscript>
+  <div class="wrap"><div class="panel">
+    <h1>系統維護中</h1>
+    <p class="lead">多奇教育訓練正在進行例行維護，請稍後再試。
+      若有急件請來信 <a href="mailto:training@miniasp.com">training@miniasp.com</a>。</p>
+  </div></div>
+</noscript>
+
+<script type="module">
+/* ===========================================================================
+   CONFIG — 維護時要改的東西全部在這裡
+   =========================================================================== */
+const CONFIG = {
+  /* 圖片站台網址（結尾不要斜線）。**留空也完全沒問題**：
+     主視覺與品牌標記已內嵌在本檔（data URI），這裡只是「有更好、沒有也不影響」的加分項。
+     例：'https://static.duotify.com/learn-offline'
+     預期檔名：  mascot.png（主視覺插畫，透明背景 PNG，見 ops/assets/mascot.png）
+                logo.png  （品牌標記，正方形透明 PNG，見 ops/assets/logo.png；
+                            沒有的話會用內嵌的那份，畫面一樣正常） */
+  assetBase: '',
+
+  /* 預計恢復時間。留空 = 不顯示倒數區塊。
+     請用含時區的 ISO 8601 字串，+08:00 為台北時間。
+     例：'2026-09-08T22:00:00+08:00' */
+  estimatedReturn: '',
+
+  /* 自動偵測站台恢復（每 N 毫秒對本站發一次 HEAD；503 = 還在維護）。
+     這個探測同時決定本頁的「身分」，見下方 decideMode()。 */
+  autoDetect: true,
+  detectIntervalMs: 20000,
+
+  /* GitHub Pages 根頁的路徑。只是「零閃爍」用的提示，真正的判斷還是以探測結果為準。 */
+  toyPath: '/',
+
+  /* 恢復後自動重新整理的倒數秒數 */
+  autoReloadSeconds: 5,
+
+  /* 面板下方那句輪播文案 */
+  quotes: [
+    '你今天已經很努力了，這次的等待不算在你頭上。',
+    '課程不會跑掉，進度也都幫你記著。',
+    '維護的人也還在線上，我們一起加油。',
+    '這杯咖啡，記得喝完再回來。',
+    '一層一層堆起來的東西，才站得住——學東西也是。',
+    '休息不是偷懶，是為了等一下走得更遠。'
+  ],
+
+  /* 遊戲模式的輪播小語（站台是活的，就別提維護了） */
+  toyQuotes: [
+    '切得越準，塔就越高——跟學東西一樣。',
+    '手滑了也沒關係，再堆一次就好。',
+    '休息不是偷懶，是為了等一下走得更遠。',
+    '一層一層堆起來的東西，才站得住。',
+    '玩完記得回去把那一章看完。'
+  ]
+};
+
+/* ===========================================================================
+   共用小工具
+   =========================================================================== */
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+/** localStorage 在無痕模式／封鎖 cookie 的瀏覽器會直接 throw，一律包起來 */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+};
+
+const THEME_KEY = 'learn_offline_theme';
+const themeControl = (() => {
+  const root = document.documentElement;
+  const button = $('themeBtn');
+  const meta = $('themeColorMeta');
+  const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  const current = () => root.dataset.theme === 'dark' ? 'dark' : 'light';
+  const paint = () => {
+    const dark = current() === 'dark';
+    const label = dark ? '切換為淺色模式' : '切換為深色模式';
+    button.setAttribute('aria-pressed', String(dark));
+    button.setAttribute('aria-label', label);
+    if (meta) meta.content = dark ? '#1b1715' : '#fffdfc';
+  };
+  const apply = (theme, persist) => {
+    root.dataset.theme = theme === 'dark' ? 'dark' : 'light';
+    if (persist) store.set(THEME_KEY, root.dataset.theme);
+    paint();
+    document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: root.dataset.theme } }));
+  };
+
+  paint();
+  button.addEventListener('click', () => apply(current() === 'dark' ? 'light' : 'dark', true));
+  if (media && media.addEventListener){
+    media.addEventListener('change', (event) => {
+      const saved = store.get(THEME_KEY, '');
+      if (saved !== 'light' && saved !== 'dark') apply(event.matches ? 'dark' : 'light', false);
+    });
+  }
+  return { current };
+})();
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ===========================================================================
+   本檔的兩種身分
+   ---------------------------------------------------------------------------
+   根頁路徑相符時先切成遊戲模式消除閃動，最後一律以站台探測結果為準：
+   探測到 503 = 維護中；探測到 2xx = 站台活著，這頁顯示為小遊戲。
+   =========================================================================== */
+let isToy = false;
+let hasWebgl = true;
+
+const h1El = document.querySelector('h1');
+const leadEl = document.querySelector('.lead');
+const descriptionEl = document.querySelector('meta[name="description"]');
+const ogTitleEl = document.querySelector('meta[property="og:title"]');
+const ogDescriptionEl = document.querySelector('meta[property="og:description"]');
+const twitterTitleEl = document.querySelector('meta[name="twitter:title"]');
+const twitterDescriptionEl = document.querySelector('meta[name="twitter:description"]');
+const MAINT = {
+  title: document.title,
+  description: descriptionEl ? descriptionEl.content : '',
+  h1: h1El.innerHTML,
+  lead: leadEl.innerHTML
+};
+
+function setPageMetadata(title, description){
+  document.title = title;
+  if (descriptionEl) descriptionEl.content = description;
+  if (ogTitleEl) ogTitleEl.content = title;
+  if (ogDescriptionEl) ogDescriptionEl.content = description;
+  if (twitterTitleEl) twitterTitleEl.content = title;
+  if (twitterDescriptionEl) twitterDescriptionEl.content = description;
+}
+
+/** 依「身分 × 有沒有 3D 場景」決定標題與說明文案 */
+function renderCopy(){
+  if (!isToy && hasWebgl){
+    setPageMetadata(MAINT.title, MAINT.description);
+    h1El.innerHTML = MAINT.h1;
+    leadEl.innerHTML = MAINT.lead;
+  } else if (!isToy && !hasWebgl){
+    setPageMetadata(MAINT.title, '多奇教育訓練正在進行例行維護，這台裝置未啟用 3D 遊戲支援。');
+    h1El.innerHTML = MAINT.h1;
+    // 沒有塔可以堆，就不要邀請使用者去堆
+    leadEl.innerHTML = '我們正在進行例行維護，讓課程播放與學習紀錄跑得更順一點。<br>' +
+                       '這段時間先起身走走、倒杯水、伸展一下，<br>回來的時候一切都會就緒。';
+  } else if (isToy && hasWebgl){
+    setPageMetadata('疊塔小遊戲 — 多奇教育訓練', '多奇教育訓練的瀏覽器疊塔小遊戲，切得越準，塔就越高。');
+    h1El.innerHTML = '休息一下<br>陪這座<span class="soft">塔</span>堆高一點';
+    leadEl.innerHTML = '卡住的時候，來疊幾層吧。<br>' +
+                       '點一下畫面或按空白鍵放下這一層，切得越準、塔就撐得越高。';
+  } else {
+    setPageMetadata('疊塔小遊戲 — 多奇教育訓練', '目前的裝置不支援疊塔小遊戲的 3D 繪圖功能。');
+    h1El.innerHTML = '這台裝置<span class="soft">跑不動</span>這個小遊戲';
+    leadEl.innerHTML = '疊塔需要 3D 繪圖支援，這台裝置沒有。<br>' +
+                       '不過這隻打盹的電腦可以陪你坐一會兒。';
+  }
+}
+
+function setToyMode(on){
+  if (isToy === on) return;
+  isToy = on;
+  document.body.classList.toggle('toy', on);
+  renderCopy();
+  setQuotes(on ? CONFIG.toyQuotes : CONFIG.quotes);
+}
+
+// 路徑提示的呼叫刻意放在下方 setQuotes 定義之後（避免 let 的暫時死區）。
+
+/* ===========================================================================
+   選配的外部圖片（漸進升級）
+   ---------------------------------------------------------------------------
+   頁面本身已內嵌一張壓縮版主視覺，所以這裡的邏輯永遠是「加分」而非「必要」：
+   載得到就換成高解析版，載不到就完全不動，畫面不會有任何破圖或位移。
+   =========================================================================== */
+(function mountImages(){
+  const base = (CONFIG.assetBase || '').replace(/\/+$/, '');
+  if (!base) return;
+
+  // 先在記憶體裡載完，成功了才換 src，避免中途出現空白
+  const hi = new Image();
+  hi.decoding = 'async';
+  hi.onload = () => { const el = $('mascotImg'); if (el) el.src = hi.src; };
+  hi.onerror = () => { /* 保留內嵌版 */ };
+  hi.src = base + '/mascot.png';
+
+  const logo = new Image();
+  logo.decoding = 'async';
+  logo.onload = () => { const el = $('brandMark'); if (el) el.src = logo.src; };
+  logo.onerror = () => { /* 保留內嵌的標記 */ };
+  logo.src = base + '/logo.png';
+})();
+
+/* ===========================================================================
+   一句話輪播
+   維護／遊戲兩種身分用不同的小語，setQuotes() 可以中途整組換掉。
+   =========================================================================== */
+let quoteList = CONFIG.quotes;
+let quoteIndex = 0;
+
+function setQuotes(list){
+  if (!Array.isArray(list) || !list.length) return;
+  quoteList = list;
+  quoteIndex = 0;
+  const el = $('quoteText');
+  if (el) el.textContent = list[0];
+}
+
+(function rotateQuotes(){
+  const el = $('quoteText');
+  if (!el) return;
+  setInterval(() => {
+    if (quoteList.length < 2) return;
+    el.classList.add('out');
+    setTimeout(() => {
+      quoteIndex = (quoteIndex + 1) % quoteList.length;
+      el.textContent = quoteList[quoteIndex];
+      el.classList.remove('out');
+    }, 500);
+  }, 7000);
+})();
+
+/* 路徑提示：先樂觀切成遊戲模式以消除閃動，稍後由站台探測結果確認或修正。 */
+if (CONFIG.toyPath && location.pathname.toLowerCase() === CONFIG.toyPath.toLowerCase()){
+  setToyMode(true);
+}
+
+/* ===========================================================================
+   預計恢復時間倒數
+   =========================================================================== */
+(function etaCountdown(){
+  if (!CONFIG.estimatedReturn) return;
+  const target = new Date(CONFIG.estimatedReturn);
+  if (isNaN(target.getTime())) return;      // 格式寫錯就安靜地不顯示
+
+  const box = $('eta'), clock = $('etaClock'), abs = $('etaAbs');
+  box.classList.add('on');
+  abs.textContent = '（' + target.toLocaleString('zh-TW', {
+    month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false
+  }) + '）';
+
+  const tick = () => {
+    const diff = target.getTime() - Date.now();
+    if (diff <= 0){
+      clock.textContent = '就快好了';
+      abs.textContent = '（收尾中，感謝你的耐心）';
+      return;
+    }
+    const s = Math.floor(diff / 1000);
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), ss = s % 60;
+    clock.textContent = (h > 0 ? h + ' 小時 ' : '') + m + ' 分 ' + String(ss).padStart(2, '0') + ' 秒';
+  };
+  tick();
+  setInterval(tick, 1000);
+})();
+
+/* ===========================================================================
+   站台探測：先定身分，再偵測恢復
+   ---------------------------------------------------------------------------
+   app_offline 生效時，IIS 對任何路徑都回 503；拿到非 503 就代表應用程式活著。
+   同一個探測身兼兩個用途：
+     第一次的結果  → 決定本頁是「維護頁」還是「常駐小遊戲頁」
+     之後的結果    → 維護頁專用，偵測站台恢復並把使用者帶回去
+   =========================================================================== */
+(function detectRecovery(){
+  if (!CONFIG.autoDetect) return;
+  if (!location.protocol.startsWith('http')) return;   // 本機用 file:// 開啟時不偵測
+
+  let settled = false;   // 首次探測是否已定案（身分確定）
+  let done = false;      // 已顯示恢復橫幅
+  let timer = null;
+  const banner = $('backBanner');
+
+  const recovered = () => {
+    if (done) return;
+    done = true;
+    $('statusDot').classList.add('back');
+    $('statusText').textContent = '系統已恢復服務';
+    banner.classList.add('on');
+    document.body.classList.add('is-back');   // 窄螢幕時把 HUD 讓開
+
+    let left = CONFIG.autoReloadSeconds;
+    const cd = $('backCountdown');
+    const t = setInterval(() => {
+      left -= 1;
+      if (left <= 0){ clearInterval(t); location.reload(); return; }
+      cd.textContent = left + ' 秒後自動帶你回去';
+    }, 1000);
+
+    $('stayBtn').addEventListener('click', () => {
+      clearInterval(t);
+      banner.classList.remove('on');
+      document.body.classList.remove('is-back');
+    });
+    $('goBtn').addEventListener('click', () => { clearInterval(t); location.reload(); });
+  };
+
+  const ping = async () => {
+    if (done) return;
+
+    let status;
+    try{
+      const res = await fetch(location.origin + '/?_probe=' + Date.now(), {
+        method: 'HEAD', cache: 'no-store', redirect: 'follow'
+      });
+      status = res.status;
+    }catch(e){
+      // 網路斷線、DNS 失敗等：無從判斷，維持現狀，下一輪再試
+      return;
+    }
+
+    // 只認 2xx 為「站台活著」。像 502/504（前面的 WAF、閘道）這種狀況一律當成還沒好，
+    // 寧可讓維護頁多掛一下，也不要在站台其實還不能用時就宣告恢復。
+    const alive = status >= 200 && status < 300;
+
+    if (!settled){
+      settled = true;
+      if (alive){
+        // 站台活著，代表這頁只是被當成靜態小遊戲頁在瀏覽，不需要再輪詢
+        setToyMode(true);
+        if (timer) clearInterval(timer);
+      } else {
+        // 站台真的不能用 —— 就算路徑長得像小遊戲頁也一樣（IIS 對所有路徑都回這頁）
+        setToyMode(false);
+      }
+      return;
+    }
+
+    if (alive) recovered();
+  };
+
+  ping();   // 立刻探一次把身分定下來，不要讓小遊戲頁先掛著維護文案
+  timer = setInterval(ping, Math.max(5000, CONFIG.detectIntervalMs));
+})();
+
+/* ===========================================================================
+   音效（WebAudio 合成，不需要任何音檔）
+   預設關閉，使用者按下喇叭才啟用。
+   =========================================================================== */
+const sound = (() => {
+  let ctx = null;
+  let on = store.get('learn_offline_sound', '0') === '1';
+
+  const btn = $('soundBtn');
+  const state = $('soundState');
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const disable = () => {
+    on = false;
+    btn.disabled = true;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', '瀏覽器不支援音效');
+    state.textContent = '不可用';
+    store.set('learn_offline_sound', '0');
+  };
+  const paint = () => {
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? '關閉音效' : '開啟音效');
+    state.textContent = on ? '開' : '關';
+  };
+  if (!AudioContextClass) disable();
+  else paint();
+
+  btn.addEventListener('click', () => {
+    on = !on;
+    store.set('learn_offline_sound', on ? '1' : '0');
+    paint();
+    if (on) blip(660, 0.07);
+  });
+
+  function blip(freq, dur, type){
+    if (!on) return;
+    try{
+      ctx = ctx || new AudioContextClass();
+      if (ctx.state === 'suspended') void ctx.resume().catch(disable);
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + dur + 0.02);
+    }catch(e){ disable(); }
+  }
+  return { blip };
+})();
+
+/* ===========================================================================
+   Three.js 疊塔遊戲
+   ---------------------------------------------------------------------------
+   刻意「動態 import」而不是 <script src>：
+     - 載不到（CDN 被擋 / 離線）時只會 reject，不會炸掉整頁；
+       頁面保留純 CSS 場景，文字資訊照樣完整。
+     - 版本固定在 0.160.0（單一檔案 ESM，無次級 import），減少變數。
+   物理採自寫的簡易重力積分（切下來的碎塊自由落體 + 旋轉），
+   不額外引入 cannon-es，少一個 CDN 依賴 = 少一個維護頁掛掉的理由。
+   =========================================================================== */
+const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+function loadGame(){
+  import(THREE_URL).then((THREE) => { startGame(THREE); }).catch(fallback);
+}
+
+// 先完成首屏文字與樣式，再在瀏覽器閒置時載入較大的 3D 函式庫。
+if (typeof window.requestIdleCallback === 'function'){
+  window.requestIdleCallback(loadGame, { timeout: 1200 });
+} else {
+  window.setTimeout(loadGame, 0);
+}
+
+/** 沒有 3D 場景時：收起遊戲 HUD、把資訊面板置中，並換掉會提到「堆塔」的文案 */
+function fallback(){
+  document.body.classList.add('no-webgl');
+  hasWebgl = false;
+  $('placeBtn').disabled = true;
+  renderCopy();
+}
+
+function startGame(THREE){
+  const canvas = $('stage');
+
+  // WebGL 不支援的裝置：renderer 建構會 throw
+  let renderer;
+  try{
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
+  }catch(e){
+    fallback();
+    return;
+  }
+
+  document.body.classList.add('webgl-on');
+  $('placeBtn').disabled = false;
+  const compactViewport = window.innerWidth <= 760;
+  const pixelRatioCap = compactViewport ? 1.25 : 1.5;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  const scene = new THREE.Scene();
+
+  /* --- 相機：等角正投影，疊塔遊戲的經典視角 ---------------------------------
+     視野與擺盪範圍都是「算出來的」而不是寫死的，因為版面差異很大：
+       桌機  寬螢幕 + 左側有資訊面板 → 塔要往右推
+       手機  直式窄螢幕 + 上方有面板 → 塔要往下推，而且可視寬度不足，
+             擺盪範圍必須跟著縮，否則移動中的方塊會整個飛出畫面外。
+     ------------------------------------------------------------------------- */
+  const ORBIT_R = 40, ORBIT_Y = 34;    // 相機軌道半徑與高度
+  const ISO = Math.SQRT1_2;            // 等角投影下，世界 X/Z 對螢幕水平的縮放約 cos45°
+  let orbitAngle = Math.PI / 4;
+  let VIEW_H = 9;                      // 視野半高（世界單位）
+  let MOVE_RANGE = 6.5;                // 移動方塊的擺盪範圍（resize 時重算）
+  let camYOffset = 3.4;                // 相機目標比塔頂低多少，決定塔頂落在畫面何處
+
+  const camera = new THREE.OrthographicCamera(-9, 9, 9, -9, 0.1, 300);
+
+  function layout(){
+    const w = window.innerWidth, h = window.innerHeight;
+    const aspect = w / h;
+    // 必須與 CSS 的堆疊斷點完全一致（搜尋 max-aspect-ratio），
+    // 否則 CSS 是左右分欄、JS 卻把塔往下推，塔會躲到面板底下。
+    const stacked = (w <= 760) || (w <= 1080 && aspect <= 1);
+    const desktop = !stacked;
+
+    // 直式螢幕拉遠一點，否則方塊會大到塞不下擺盪範圍
+    VIEW_H = aspect < 1 ? 12.5 : 9;
+    const halfW = VIEW_H * aspect;
+
+    // 塔要避開 UI：桌機往右（左側面板），手機往下（上方面板）
+    const shiftX = desktop ? -halfW * 0.30 : 0;
+    const shiftY = desktop ? 0 : VIEW_H * 0.42;
+    // 負值代表「相機目標在移動方塊之上」，把正在滑動的那一層壓到面板下緣以下，
+    // 玩家才看得到它、才抓得準時機。
+    camYOffset = desktop ? 3.4 : -1.0;
+
+    // 讓「擺盪到最遠時的方塊邊緣」仍留在可視範圍內
+    MOVE_RANGE = clamp(halfW / ISO - 2.8, 3.2, 6.5);
+
+    camera.left   = -halfW + shiftX;
+    camera.right  =  halfW + shiftX;
+    camera.top    =  VIEW_H + shiftY;
+    camera.bottom = -VIEW_H + shiftY;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h, false);
+  }
+  let resizeFrame = 0;
+  window.addEventListener('resize', () => {
+    if (resizeFrame) return;
+    resizeFrame = requestAnimationFrame(() => { resizeFrame = 0; layout(); });
+  }, { passive:true });
+  layout();
+
+  /* --- 光線：柔和的黏土感（半球光打底 + 一盞方向光給陰影） ------------------ */
+  let dark = document.documentElement.dataset.theme === 'dark';
+  const hemi = new THREE.HemisphereLight(dark ? 0xc8b4a8 : 0xffffff, dark ? 0x2a2320 : 0xd6cec8, 0.95);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xffffff, dark ? 1.05 : 1.35);
+  sun.castShadow = true;
+  const shadowSize = compactViewport ? 512 : 768;
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
+  sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+  sun.shadow.camera.top  =  16; sun.shadow.camera.bottom = -16;
+  sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 80;
+  sun.shadow.bias = -0.0012;
+  scene.add(sun, sun.target);
+
+  /* --- 環境粒子：慢慢往上飄的微塵 ------------------------------------------ */
+  const DUST = compactViewport ? 48 : 72;
+  const dustGeo = new THREE.BufferGeometry();
+  const dustPos = new Float32Array(DUST * 3);
+  for (let i = 0; i < DUST; i++){
+    dustPos[i*3]     = (Math.random() - 0.5) * 46;
+    dustPos[i*3 + 1] = Math.random() * 40 - 6;
+    dustPos[i*3 + 2] = (Math.random() - 0.5) * 46;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+    color: dark ? 0xd8c0ac : 0x8c7a6c,
+    size: 0.13, transparent: true, opacity: dark ? 0.55 : 0.35, depthWrite: false
+  }));
+  scene.add(dust);
+
+  function applySceneTheme(){
+    const nextDark = document.documentElement.dataset.theme === 'dark';
+    if (nextDark === dark) return;
+    dark = nextDark;
+    hemi.color.setHex(dark ? 0xc8b4a8 : 0xffffff);
+    hemi.groundColor.setHex(dark ? 0x2a2320 : 0xd6cec8);
+    sun.intensity = dark ? 1.05 : 1.35;
+    dust.material.color.setHex(dark ? 0xd8c0ac : 0x8c7a6c);
+    dust.material.opacity = dark ? 0.55 : 0.35;
+  }
+  document.addEventListener('themechange', applySceneTheme);
+
+  /* --- 遊戲參數 ------------------------------------------------------------- */
+  const BASE_SIZE   = 4;      // 基座邊長
+  const BLOCK_H     = 1.1;    // 每層高度
+  const SPEED_START = 4.2;    // MOVE_RANGE 由 layout() 依畫面比例決定
+  const SPEED_STEP  = 0.22;
+  const SPEED_MAX   = 11;
+  const PERFECT     = 0.15;   // 判定「完美」的誤差
+  const REGROW      = 0.22;   // 完美時回補的邊長
+
+  const geoUnit = new THREE.BoxGeometry(1, 1, 1);
+
+  let tower = [];      // 已固定的層 { mesh, x, z, w, d }
+  let debris = [];     // 掉落中的碎塊
+  let moving = null;   // 正在滑動的那一層
+  let axis = 'x';
+  let dir = 1;
+  let speed = SPEED_START;
+  let score = 0;
+  let combo = 0;
+  let over = false;
+  let camTargetY = 0, camTargetYGoal = 0;
+  const gameoverEl = $('gameover');
+  let gameOverTimer = 0;
+
+  let best = parseInt(store.get('learn_offline_best', '0'), 10) || 0;
+  $('best').textContent = best;
+
+  /** 依層數取色：沿用前台的品牌漸層（橘 → 蜜桃 → 藍），每約 18 層循環一次 */
+  const BRAND_STOPS = [
+    new THREE.Color(0xff7b31),   // 品牌橘
+    new THREE.Color(0xffd1b8),   // 蜜桃（漸層中繼色）
+    new THREE.Color(0x349dff)    // 品牌藍
+  ];
+  function layerColor(level){
+    const t = (level * 0.055) % 1;
+    const seg = t < 0.35 ? 0 : 1;
+    const local = seg === 0 ? t / 0.35 : (t - 0.35) / 0.65;
+    const c = BRAND_STOPS[seg].clone().lerp(BRAND_STOPS[seg + 1], local);
+    if (dark) c.multiplyScalar(0.82);   // 深色模式稍微收斂亮度，避免方塊過曝
+    return c;
+  }
+
+  function makeBlock(w, d, x, y, z, level){
+    const mesh = new THREE.Mesh(geoUnit, new THREE.MeshLambertMaterial({ color: layerColor(level) }));
+    mesh.scale.set(w, BLOCK_H, d);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    return mesh;
+  }
+
+  function disposeMesh(mesh){
+    scene.remove(mesh);
+    mesh.material.dispose();   // geometry 是共用的 geoUnit，不能 dispose
+  }
+
+  function reset(){
+    if (gameOverTimer){
+      clearTimeout(gameOverTimer);
+      gameOverTimer = 0;
+    }
+    tower.forEach(b => disposeMesh(b.mesh));
+    debris.forEach(b => disposeMesh(b.mesh));
+    if (moving) disposeMesh(moving.mesh);
+    tower = []; debris = []; moving = null;
+
+    axis = 'x'; dir = 1; speed = SPEED_START;
+    score = 0; combo = 0; over = false;
+    camTargetY = camTargetYGoal = 0;
+    orbitAngle = Math.PI / 4;
+
+    $('score').textContent = '0';
+    if (gameoverEl.open && typeof gameoverEl.close === 'function') gameoverEl.close();
+    gameoverEl.classList.remove('on');
+    $('hint').style.visibility = '';
+
+    // 基座
+    const mesh = makeBlock(BASE_SIZE, BASE_SIZE, 0, BLOCK_H / 2, 0, 0);
+    tower.push({ mesh, x: 0, z: 0, w: BASE_SIZE, d: BASE_SIZE });
+    spawn();
+  }
+
+  function spawn(){
+    const top = tower[tower.length - 1];
+    const y = tower.length * BLOCK_H + BLOCK_H / 2;
+    const startPos = -MOVE_RANGE * dir;
+    const x = axis === 'x' ? startPos : top.x;
+    const z = axis === 'z' ? startPos : top.z;
+    moving = {
+      mesh: makeBlock(top.w, top.d, x, y, z, tower.length),
+      x, z, w: top.w, d: top.d, y
+    };
+    camTargetYGoal = Math.max(0, y - camYOffset);
+  }
+
+  function toast(text){
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.remove('show');
+    void el.offsetWidth;          // 強制 reflow 才能重播動畫
+    el.classList.add('show');
+  }
+
+  function place(){
+    if (over || !moving) return;
+
+    const top = tower[tower.length - 1];
+    const prevPos = axis === 'x' ? top.x : top.z;
+    const curPos  = axis === 'x' ? moving.x : moving.z;
+    const size    = axis === 'x' ? top.w : top.d;
+    const delta   = curPos - prevPos;
+
+    // 完全錯過 → 結束
+    if (Math.abs(delta) >= size){
+      gameOver();
+      return;
+    }
+
+    let newSize, newPos, perfect = false;
+
+    if (Math.abs(delta) < PERFECT){
+      // 完美落點：對齊上一層，並回補一點邊長當獎勵
+      perfect = true;
+      combo += 1;
+      newPos = prevPos;
+      newSize = Math.min(BASE_SIZE, size + REGROW);
+      toast(combo > 1 ? '完美 ×' + combo + '！' : '完美！');
+      sound.blip(880 + Math.min(combo, 8) * 60, 0.10, 'triangle');
+    } else {
+      combo = 0;
+      const start = Math.max(prevPos - size / 2, curPos - size / 2);
+      const end   = Math.min(prevPos + size / 2, curPos + size / 2);
+      newSize = end - start;
+      newPos  = (start + end) / 2;
+      sound.blip(420, 0.07);
+
+      // 切掉的部分變成碎塊往下掉
+      const cutSize = size - newSize;
+      const cutPos  = delta > 0 ? end + cutSize / 2 : start - cutSize / 2;
+      const cw = axis === 'x' ? cutSize : moving.w;
+      const cd = axis === 'z' ? cutSize : moving.d;
+      const cx = axis === 'x' ? cutPos  : moving.x;
+      const cz = axis === 'z' ? cutPos  : moving.z;
+      const cm = makeBlock(cw, cd, cx, moving.y, cz, tower.length);
+      cm.material.color.copy(moving.mesh.material.color);
+      debris.push({
+        mesh: cm,
+        vy: 0,
+        vx: axis === 'x' ? Math.sign(delta) * 1.6 : 0,
+        vz: axis === 'z' ? Math.sign(delta) * 1.6 : 0,
+        spin: (Math.random() - 0.5) * 3
+      });
+    }
+
+    // 定版這一層
+    const w = axis === 'x' ? newSize : moving.w;
+    const d = axis === 'z' ? newSize : moving.d;
+    const x = axis === 'x' ? newPos  : moving.x;
+    const z = axis === 'z' ? newPos  : moving.z;
+    moving.mesh.scale.set(w, BLOCK_H, d);
+    moving.mesh.position.set(x, moving.y, z);
+    if (perfect){
+      // 輕微彈一下，讓「完美」有回饋感。
+      // 這裡要抓住 mesh 本身，不能在 callback 裡讀 moving——那時它已經指向新生成的那層了。
+      const bounced = moving.mesh;
+      bounced.scale.set(w * 1.06, BLOCK_H * 0.94, d * 1.06);
+      setTimeout(() => bounced.scale.set(w, BLOCK_H, d), 90);
+    }
+    tower.push({ mesh: moving.mesh, x, z, w, d });
+
+    score += 1;
+    $('score').textContent = score;
+    if (score === 1) $('hint').style.visibility = 'hidden';
+    if (score > best){
+      best = score;
+      $('best').textContent = best;
+      store.set('learn_offline_best', String(best));
+    }
+
+    axis = axis === 'x' ? 'z' : 'x';
+    dir *= -1;
+    speed = Math.min(SPEED_MAX, speed + SPEED_STEP);
+    moving = null;
+    spawn();
+  }
+
+  function gameOver(){
+    over = true;
+    sound.blip(180, 0.28, 'sawtooth');
+
+    // 最後那塊直接掉下去
+    if (moving){
+      debris.push({
+        mesh: moving.mesh, vy: 0,
+        vx: axis === 'x' ? Math.sign(moving.x) * 1.2 : 0,
+        vz: axis === 'z' ? Math.sign(moving.z) * 1.2 : 0,
+        spin: (Math.random() - 0.5) * 3
+      });
+      moving = null;
+    }
+
+    $('goScore').textContent = score;
+    $('goTitle').textContent = score >= 15 ? '這座塔真的很高' : (score >= 6 ? '穩穩地堆了一段' : '塔倒了，沒關係');
+    $('goMsg').textContent =
+      score >= 15 ? '維護大概還沒好，但你已經很厲害了。' :
+      score >= 6  ? '維護也是這樣，一層一層慢慢來。' :
+                    '沒有人第一次就疊得很整齊，再來一次吧。';
+    if (gameOverTimer) clearTimeout(gameOverTimer);
+    gameOverTimer = setTimeout(() => {
+      gameOverTimer = 0;
+      if (!over) return;
+      if (typeof gameoverEl.showModal === 'function') gameoverEl.showModal();
+      else gameoverEl.classList.add('on');
+      $('againBtn').focus();
+    }, 550);
+  }
+
+  /* --- 輸入 ----------------------------------------------------------------- */
+  function onTap(e){
+    // 點在面板／按鈕上時不算「落塊」
+    if (e.target instanceof Element && e.target.closest('.panel, .hud, .gameover, .back-banner, .theme-btn')) return;
+    if (over) return;
+    place();
+  }
+  window.addEventListener('pointerdown', onTap);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape' && (gameoverEl.open || gameoverEl.classList.contains('on'))){
+      e.preventDefault();
+      reset();
+      return;
+    }
+    if (e.code === 'Space' || e.code === 'Enter'){
+      if (e.target instanceof Element && e.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+      e.preventDefault();
+      over ? reset() : place();
+    }
+  });
+  $('againBtn').addEventListener('click', reset);
+  $('placeBtn').addEventListener('click', place);
+  $('resetBtn').addEventListener('click', reset);
+
+  /* --- 主迴圈 --------------------------------------------------------------- */
+  const GRAVITY = 26;
+  let last = performance.now();
+  let running = true;
+  document.addEventListener('visibilitychange', () => {
+    running = !document.hidden;
+    last = performance.now();     // 回來時避免一次跳很大的 dt
+    if (running) requestAnimationFrame(loop);
+  });
+
+  function loop(now){
+    if (!running) return;
+    requestAnimationFrame(loop);
+
+    const dt = Math.min(0.05, (now - last) / 1000);   // 夾住 dt，切分頁回來不會瞬移
+    last = now;
+
+    // 移動中的那一層：碰到邊界就折返
+    if (moving && !over){
+      const p = (axis === 'x' ? moving.x : moving.z) + dir * speed * dt;
+      let np = p;
+      if (np > MOVE_RANGE){ np = MOVE_RANGE; dir = -1; }
+      if (np < -MOVE_RANGE){ np = -MOVE_RANGE; dir = 1; }
+      if (axis === 'x'){ moving.x = np; moving.mesh.position.x = np; }
+      else             { moving.z = np; moving.mesh.position.z = np; }
+    }
+
+    // 碎塊自由落體
+    for (let i = debris.length - 1; i >= 0; i--){
+      const b = debris[i];
+      b.vy -= GRAVITY * dt;
+      b.mesh.position.y += b.vy * dt;
+      b.mesh.position.x += b.vx * dt;
+      b.mesh.position.z += b.vz * dt;
+      b.mesh.rotation.z += b.spin * dt;
+      b.mesh.rotation.x += b.spin * 0.6 * dt;
+      if (b.mesh.position.y < camTargetY - 30){
+        disposeMesh(b.mesh);
+        debris.splice(i, 1);
+      }
+    }
+
+    // 相機跟著塔長高；結束後緩慢繞行，讓成果看得清楚
+    camTargetY += (camTargetYGoal - camTargetY) * clamp(dt * 4, 0, 1);
+    if (over && !reduceMotion) orbitAngle += dt * 0.14;
+    camera.position.set(
+      Math.sin(orbitAngle) * ORBIT_R,
+      camTargetY + ORBIT_Y,
+      Math.cos(orbitAngle) * ORBIT_R
+    );
+    camera.lookAt(0, camTargetY, 0);
+
+    sun.position.set(8, camTargetY + 22, 12);
+    sun.target.position.set(0, camTargetY, 0);
+    sun.target.updateMatrixWorld();
+
+    // 微塵緩緩上飄，飄出上界就回到下面
+    if (!reduceMotion){
+      const arr = dustGeo.attributes.position.array;
+      for (let i = 0; i < DUST; i++){
+        arr[i*3 + 1] += dt * 0.5;
+        if (arr[i*3 + 1] > camTargetY + 24) arr[i*3 + 1] = camTargetY - 14;
+      }
+      dustGeo.attributes.position.needsUpdate = true;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  reset();
+  requestAnimationFrame(loop);
+}
+</script>
 </body>
 </html>
